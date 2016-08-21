@@ -1,26 +1,16 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative import AbstractConcreteBase
 import math
 import json
+
 Base = declarative_base()
 
 
-class Player(Base):
-    __tablename__ = 'player'
-
+class AbstractBatter(AbstractConcreteBase, Base):
     playerid = Column(Integer, nullable=False, primary_key=True)
-    Name = Column(String(30), nullable=False)
-    Birth_Year = Column(Integer)
 
-
-
-
-class Batter(Base):
-    __tablename__ = 'batter'
-
-    Team = Column(String(30))
     Year = Column(Integer, nullable=False, primary_key=True)
-    Age = Column(Integer)
     G = Column(Integer)
     AB = Column(Integer)
     PA = Column(Integer)
@@ -218,7 +208,6 @@ class Batter(Base):
     Def = Column(Float)
     wSB = Column(Float)
     UBR = Column(Float)
-    Age_Rng = Column(String(30))
     Off = Column(Float)
     Lg = Column(Float)
     wGDP = Column(Float)
@@ -229,43 +218,99 @@ class Batter(Base):
     Med_Percentage = Column(Float)
     Hard_Percentage = Column(Float)
 
+    def batted_ball(self):
+        batted_ball = {'BABIP': self.BABIP or 0, 'GB/FB': self.GB_Divided_By_FB or 0, 'LD%': self.LD_Percentage or 0,
+                       'GB%': self.GB_Percentage or 0, 'FB%': self.FB_Percentage or 0,
+                       'IFFB%': self.IFFB_Percentage or 0,
+                       'HR/FB': self.HR_Divided_By_FB or 0, 'IFH': self.IFH or 0, 'BUH': self.BUH or 0,
+                       'BUH%': self.BUH_Percentage or 0,
+                       'Pull%': self.Pull_Percentage or 0, 'Cent%': self.Cent_Percentage or 0,
+                       'Oppo%': self.Oppo_Percentage or 0,
+                       'Soft%': self.Soft_Percentage or 0, 'Med%': self.Med_Percentage or 0,
+                       'Hard%': self.Hard_Percentage or 0}
+
+        return batted_ball
+
+    def plate_discipline(self):
+        plate_discipline = {'O-Swing%': self.O_Swing_Percentage or 0, 'Z-Swing%': self.Z_Swing_Percentage or 0,
+                            'Swing%': self.Swing_Percentage or 0, 'O-Contact%': self.O_Contact_Percentage or 0,
+                            'Z-Contact%': self.Z_Contact_Percentage or 0, 'Contact%': self.Contact_Percentage or 0,
+                            'Zone%': self.Zone_Percentage or 0,
+                            'F-Strike%': self.F_Strike_Percentage or 0, 'SwStr%': self.SwStr_Percentage or 0}
+        return plate_discipline
+
+    def standard(self):
+        standard = {'G': self.G, 'AB': self.AB, 'PA': self.PA, 'H': self.H, '1B': self.Single_Bat,
+                    '2B': self.Double_Bat, '3B': self.Triple_Bat, 'HR': self.HR, 'R': self.R, 'RBI': self.RBI,
+                    'BB': self.BB, 'IBB': self.IBB, 'SO': self.SO, 'HBP': self.HBP, 'SF': self.SF, 'SH': self.SH,
+                    'GDP': self.GDP, 'SB': self.SB, 'CS': self.CS, 'AVG': self.AVG}
+        return standard
+
+    def advanced(self):
+        advanced = {'PA': self.PA, 'BB%': self.BB_Percentage, 'K%': self.K_Percentage, 'BB/K': self.BB_Divided_By_K,
+                    'AVG': self.AVG, 'OBP': self.OBP, 'SLG': self.SLG, 'OPS': self.OPS, 'ISO': self.ISO,
+                    'Spd': self.Spd, 'BABIP': self.BABIP, 'UBR': self.UBR, 'wGDP': self.wGDP, 'wSB': self.wSB,
+                    'wRC': self.wRC, 'wRAA': self.wRAA, 'wOBA': self.wOBA, 'wRC+': self.wRC_Plus}
+        return advanced
+
+    def advance_extracted(self):
+        advanced = {'BB%': self.BB_Percentage, 'K%': self.K_Percentage,
+                    'AVG': self.AVG, 'OBP': self.OBP, 'SLG': self.SLG, 'OPS': self.OPS, 'ISO': self.ISO,
+                    'Spd': self.Spd, 'BABIP': self.BABIP, 'UBR': self.UBR, 'wGDP': self.wGDP, 'wSB': self.wSB}
+
+        return advanced
+
+    def woba_related(self):
+        woba_related = {'AB': self.AB, 'HBP': self.HBP
+            , '1B': self.Single_Bat, '2B': self.Double_Bat, '3B': self.Triple_Bat, 'HR': self.HR, 'IBB': self.IBB,
+                        'SF': self.SF}
+
+        return woba_related
+
+    def predictable(self):
+        predictable_fields = self.plate_discipline().copy()
+        predictable_fields.update(self.batted_ball())
+        predictable_fields.pop('BABIP', None)
+        return predictable_fields
+
+    def performance(self):
+        display_fields = self.standard().copy()
+        display_fields.update(self.advanced())
+
+        # derivative fields
+        display_fields.pop('BABIP', None)
+        display_fields.pop('wOBA', None)
+        display_fields.pop('wRC', None)
+        display_fields.pop('wRC+', None)
+        display_fields.pop('Spd', None)
+
+        display_fields.pop('PA', None)
+        display_fields.pop('AB', None)
+        display_fields.pop('G', None)
+
+        return display_fields
+
+
+class Batter(AbstractBatter):
+    __tablename__ = 'batter'
+    Name = Column(String(30), nullable=False)
+    Birth_Year = Column(Integer)
+    Team = Column(String(30))
+    Age = Column(Integer)
+    Age_Rng = Column(String(30))
+    __mapper_args__ = {
+        'polymorphic_identity': 'batter',
+        'concrete': True}
 
     ommited_fields = ('Name', 'Team', 'Year', 'Age', 'Age_Rng', 'playerid')
 
-    def no_condition_manhatten_distance(self, comp_batter):
-        # only compare float part, since G is different the integer part will be meaningless.
-        distance = 0
-        for key in self.__dict__:
-            if key in comp_batter.__dict__ and isinstance(comp_batter.__dict__[key], float) \
-                    and self.__dict__[key] is not None and comp_batter.__dict__[key] is not None:
-                if "Percentage" in key:
-                    distance += abs(comp_batter.__dict__[key]/100 - self.__dict__[key]/100)
-                else:
-                    distance += abs(comp_batter.__dict__[key] - self.__dict__[key])
+    def __repr__(self):
+        return "Batter {batter_name} in Year {year}, WRC+ is {wrcplus}".format(batter_name=self.Name, year=self.Year,
+                                                                               wrcplus=self.wRC_Plus)
 
-        return distance
 
-    def no_condition_euclidean_distance(self, comp_batter):
-        distance = 0
-        for key in self.__dict__:
-            if key in comp_batter.__dict__ and isinstance(comp_batter.__dict__[key], float) \
-                    and self.__dict__[key] is not None and comp_batter.__dict__[key] is not None:
-                if "Percentage" in key:
-                    distance += ((comp_batter.__dict__[key]/100 - self.__dict__[key]/100) ** 2)
-                else:
-                    distance += ((comp_batter.__dict__[key] - self.__dict__[key]) ** 2)
-
-        return math.sqrt(distance)
-
-    def no_condition_minkowski_distance(self, comp_batter, p):
-        assert p is not None and p != 0
-        distance = 0
-        for key in self.__dict__:
-            if key in comp_batter.__dict__ and isinstance(comp_batter.__dict__[key], float) \
-                    and self.__dict__[key] is not None and comp_batter.__dict__[key] is not None:
-                if "Percentage" in key:
-                    distance += ((comp_batter.__dict__[key]/100 - self.__dict__[key]/100) ** p)
-                else:
-                    distance += ((comp_batter.__dict__[key] - self.__dict__[key]) ** p)
-
-        return distance ** float((1.0/p))
+class Normalized_Batter(AbstractBatter):
+    __tablename__ = 'normalized_batter'
+    __mapper_args__ = {
+        'polymorphic_identity': 'normalized_batter',
+        'concrete': True}
